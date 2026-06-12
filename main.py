@@ -20,7 +20,7 @@ except ImportError:
 
 
 APP_NAME = "PDF EasyLock"
-APP_VERSION = "2.0"
+APP_VERSION = "1.0.0"
 
 AES_VALUES = ("AES-256", "AES-128")
 APPEARANCE_VALUES = ("System", "Light", "Dark")
