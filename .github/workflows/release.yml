@@ -1,0 +1,71 @@
+name: Release
+
+# `vX.Y.Z` 形式のタグ push で起動。手動実行も可。
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v1.0.0). Must already exist.'
+        required: true
+
+permissions:
+  contents: write   # GitHub Release 作成に必要
+
+jobs:
+  build:
+    name: Build Windows executable
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build executable (PyInstaller)
+        shell: pwsh
+        run: .\build.ps1
+
+      - name: Stamp version into artifact filename
+        id: stamp
+        shell: pwsh
+        run: |
+          $tag = "${{ github.event.inputs.tag || github.ref_name }}"
+          Copy-Item dist\pdf-easylock.exe "dist\pdf-easylock-$tag.exe"
+          "tag=$tag"                                          >> $env:GITHUB_OUTPUT
+          "exe=dist/pdf-easylock-$tag.exe"                    >> $env:GITHUB_OUTPUT
+
+      - name: Upload build artifact (preserved for 30 days)
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdf-easylock-${{ steps.stamp.outputs.tag }}-windows
+          path: |
+            ${{ steps.stamp.outputs.exe }}
+            dist/THIRD-PARTY-NOTICES.txt
+          retention-days: 30
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.stamp.outputs.tag }}
+          name: PDF EasyLock ${{ steps.stamp.outputs.tag }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          files: |
+            ${{ steps.stamp.outputs.exe }}
+            dist/THIRD-PARTY-NOTICES.txt
